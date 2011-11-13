@@ -1,0 +1,6 @@
+include MANIFEST.in
+include .gitignore
+include README.md
+include celerywatch/bin/stopCeleryd.sh
+recursive-include celerywatch *.py
+prune celerywatch/*.pyc
