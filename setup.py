@@ -10,9 +10,9 @@ setup(
     license="BSD",
     author_email="matt@mattlong.org",
     url="http://pypi.python.org/pypi/celerywatch/",
-    description="A ",
-    long_description="Charon is a set a tools to manage an instance of the load balancer HAProxy. You can do so either locally or remotely using either the command-line directly or via a Fabric wrapper.",
-    install_requires=['djcelery==2.4.1'],
+    description="Runs a celery app that monitors celeryd and stops it if it fails too many tasks.",
+    long_description="Runs a celery app that monitors celeryd and stops it if it fails too many tasks.",
+    install_requires=['django-celery==2.4.1'],
     zip_safe=False,
     #entry_points={
     #    'console_scripts': ['charon = charon.server:main',],

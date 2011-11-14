@@ -19,7 +19,7 @@ class PDFWorkerMonitor(object):
         #cmds = ['timeout', '-k', '1s', '-s', 'SIGTERM', '60s', '/etc/init.d/celeryd', 'stop']
 
         stop_script = resource_filename(__name__, 'bin/stopCeleryd.sh')
-        cmds = [stop_script, self.PROCESS_GREP or '']
+        cmds = ['sh', stop_script, self.PROCESS_GREP or '']
         proc = subprocess.Popen(cmds,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
         output, error = proc.communicate()
         if proc.returncode != 0:
