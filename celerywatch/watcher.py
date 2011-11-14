@@ -1,10 +1,26 @@
-import sys, subprocess
+import os, sys, subprocess
 from pkg_resources import resource_filename
 
 from celery.app import app_or_default
 from celery.datastructures import LRUCache
 
+DEBUG = False
+
 TASK_HISTORY = LRUCache(limit=10)
+
+def run_command(cmds):
+    proc = subprocess.Popen(cmds,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    output, error = proc.communicate()
+    return (proc.returncode, output, error)
+    if proc.returncode != 0:
+        print 'error'
+        print output
+        print error
+        sys.exit(1)
+    else:
+        print output.strip()
+        print 'done'
+        sys.exit(0)
 
 class PDFWorkerMonitor(object):
 
@@ -21,43 +37,56 @@ class PDFWorkerMonitor(object):
         self.POST_STOP_SCRIPT=post_stop_script
         self.OVERRIDE_STOP_SCRIPT=override_stop_script
 
-        #print self.MIN_TASKS, self.STOP_THRESHOLD, self.PROCESS_GREP, self.POST_STOP_SCRIPT, self.OVERRIDE_STOP_SCRIPT
+        if DEBUG:
+            for k,v in filter(lambda (k,v): k.upper() == k, vars(self).iteritems()):
+                print k, v
 
         self.task_count = 0
         self.error_rate = 0.0
 
     def kill_celery(self, non_daemon=False):
-        #cmds = ['timeout', '-k', '1s', '-s', 'SIGTERM', '60s', '/etc/init.d/celeryd', 'stop']
+        if not self.OVERRIDE_STOP_SCRIPT:
+            print 'stopping celeryd...'
+            stop_script = resource_filename(__name__, 'bin/stopCeleryd.sh')
+            cmds = ['sh', stop_script, self.PROCESS_GREP or '']
+            (returncode, output, error) = run_command(cmds)
+            if returncode != 0:
+                print 'error stopping celeryd:'
+                print output.strip()
+                print error.strip()
+                sys.exit(1)
+            else:
+                print output.strip()
+                print 'done'
 
-        stop_script = resource_filename(__name__, 'bin/stopCeleryd.sh')
-        cmds = ['sh', stop_script, self.PROCESS_GREP or '']
-        proc = subprocess.Popen(cmds,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-        output, error = proc.communicate()
-        if proc.returncode != 0:
-            print 'error'
-            print output
-            print error
-            sys.exit(1)
-        else:
-            print output.strip()
-            print 'done'
-            sys.exit(0)
+        if self.POST_STOP_SCRIPT and os.path.isfile(self.POST_STOP_SCRIPT):
+            print 'running post-stop script %s' % (self.POST_STOP_SCRIPT,)
+            cmds = [self.POST_STOP_SCRIP]
+            (returncode, output, error) = run_command(cmds)
+            if returncode != 0:
+                print 'error running post-stop script:'
+                print output.strip()
+                print error.strip()
+            else:
+                print output.strip()
+                print 'done'
+        sys.exit(0)
+            
 
     def on_task_failed(self, event):
-        #event fields (unicode): exception, traceback, uuid, clock, timestamp, hostname, type
-
+        #task-failed event fields (unicode): exception, traceback, uuid, clock, timestamp, hostname, type
         self.task_count += 1
         TASK_HISTORY[event['uuid']] = 'fail'
         fails = filter(lambda pair: pair[1] == 'fail', TASK_HISTORY.items())
         if self.task_count >= self.MIN_TASKS:
-            self.error_rate = len(fails)/float(len(TASK_HISTORY.keys()))
+            recent_task_count = len(TASK_HISTORY.keys())
+            self.error_rate = len(fails)/float(recent_task_count)
             if self.error_rate > self.STOP_THRESHOLD:
-                print 'Error rate of %.0f%%; stopping celeryd...' % (self.error_rate*100,)
+                print 'Error rate of %.0f%% over last %d tasks; after %d lifetime tasks' % (self.error_rate*100, recent_task_count, self.task_count,)
                 self.kill_celery()
 
     def on_task_succeeded(self, event):
-        #task-success: runtime, uuid, clock, timestamp, hostname, type, result
-
+        #task-success event fields (unicode): runtime, uuid, clock, timestamp, hostname, type, result
         self.task_count += 1
         TASK_HISTORY[event['uuid']] = 'success'
 
