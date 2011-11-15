@@ -2,7 +2,7 @@
 
 PROCESS_GREP=$1
 
-if [ -x /etc/init.d/celeryd ]; then
+if [ -x "/etc/init.d/celeryd" ]; then
   echo "Found daemon script..."
   /etc/init.d/celeryd stop
 else
