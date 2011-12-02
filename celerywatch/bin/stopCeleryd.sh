@@ -3,9 +3,9 @@
 PROCESS_GREP=$1
 
 if [ -x "/etc/init.d/celeryd" ]; then
-  echo "Found daemon script..."
+  echo "Stopping celeryd with daemon script..."
   /etc/init.d/celeryd stop
 else
-  echo "Looking for celeryd processes with '${PROCESS_GREP}'..."
-  ps ax | grep -m 1 "l\+.*celeryd.*${PROCESS_GREP}" | awk '{print $1}' | xargs kill
+  echo "Daemon script not found; killing celeryd processes with '${PROCESS_GREP}'..."
+  ps ax | grep -m 1 "l\+.*celeryd .*${PROCESS_GREP}" | awk '{print $1}' | xargs kill
 fi

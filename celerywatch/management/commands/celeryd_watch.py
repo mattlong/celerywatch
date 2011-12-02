@@ -1,4 +1,4 @@
-from django.core.management.base import BaseCommand
+#from django.core.management.base import BaseCommand
 
 from djcelery.app import app
 from djcelery.management.base import CeleryCommand

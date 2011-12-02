@@ -1,4 +1,4 @@
-import os, sys, subprocess
+import os, sys, subprocess, signal
 from pkg_resources import resource_filename
 from optparse import make_option
 
@@ -20,6 +20,8 @@ class CeleryWatcher(Daemon):
         super(CeleryWatcher, self).__init__(None)
 
         self.app = app or app_or_default(None)
+
+    def reset(self):
         self.task_count = 0
         self.error_rate = 0.0
         self.TASK_HISTORY = LRUCache(limit=10)
@@ -32,15 +34,23 @@ class CeleryWatcher(Daemon):
             'task-failed': self.on_task_failed,
         })
 
-        print 'Monitoring celeryd for %.0f%% error rate...' % (self.options['stop_threshold']*100, )
         if self.options['daemonize']:
             self.pidfile = self.options['pidfile']
+            self.stdout = '/tmp/celerywatch.log'
             self.start()
         else:
+            self.pidfile = self.options['pidfile'] #even if we don't daemonize, must set it to a non-None value
             self.run()
 
     def run(self):
+        def handler(signum, frame):
+            self.stop()
+        signal.signal(signal.SIGTERM, handler)
+
         try:
+            self.reset()
+            print 'Monitoring celeryd for %.0f%% error rate...' % (self.options['stop_threshold']*100, )
+            sys.stdout.flush()
             self.recv.capture()
         except (KeyboardInterrupt, SystemExit):
             self.cleanup()
@@ -62,30 +72,36 @@ class CeleryWatcher(Daemon):
     def kill_celery(self, non_daemon=False):
         if not self.options['override_stop_script']:
             print 'stopping celeryd...'
+            sys.stdout.flush()
             stop_script = resource_filename(__name__, 'bin/stopCeleryd.sh')
             cmds = ['sh', stop_script, self.options['process_grep'] or '']
             (returncode, output, error) = run_command(cmds)
             if returncode != 0:
                 print 'error stopping celeryd:'
                 print output.strip(), '\n', error.strip()
-                self.stop()
+                sys.stdout.flush()
+                self.reset()
             else:
                 print output.strip()
                 print 'done'
+                sys.stdout.flush()
 
         post_stop_script = self.options['post_stop_script']
         if post_stop_script and os.path.isfile(post_stop_script):
             print 'running post-stop script %s' % (post_stop_script,)
+            sys.stdout.flush()
             cmds = [post_stop_script]
             (returncode, output, error) = run_command(cmds)
             if returncode != 0:
                 print 'error running post-stop script:'
                 print output.strip()
                 print error.strip()
+                sys.stdout.flush()
             else:
                 print output.strip()
                 print 'done'
-        self.stop()
+                sys.stdout.flush()
+        self.reset()
 
     #task-failed event fields (unicode): exception, traceback, uuid, clock, timestamp, hostname, type
     def on_task_failed(self, event):
@@ -98,6 +114,7 @@ class CeleryWatcher(Daemon):
             if self.error_rate > self.options['stop_threshold']:
                 print 'Error rate of %.0f%% over last %d tasks; after %d lifetime tasks' % (
                         self.error_rate*100, recent_task_count, self.task_count,)
+                sys.stdout.flush()
                 self.kill_celery()
 
     #task-success event fields (unicode): runtime, uuid, clock, timestamp, hostname, type, result

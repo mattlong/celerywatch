@@ -49,8 +49,8 @@ class Daemon(object):
         sys.stdout.flush()
         sys.stderr.flush()
         si = file(self.stdin, 'r')
-        so = file(self.stdout, 'a+')
-        se = file(self.stderr, 'a+', 0)
+        so = file(self.stdout, 'a', 0)
+        se = file(self.stderr, 'a', 0)
         os.dup2(si.fileno(), sys.stdin.fileno())
         os.dup2(so.fileno(), sys.stdout.fileno())
         os.dup2(se.fileno(), sys.stderr.fileno())
@@ -101,19 +101,23 @@ class Daemon(object):
             sys.stderr.write(message % self.pidfile)
             return # not an error in a restart
 
+        print "Goodbye"
+        sys.exit(0)
+        #I'm just exiting because I'm expecting my daemon script to send sigterm to the daemon process directly
+
         # Try killing the daemon process    
-        try:
-            while 1:
-                os.kill(pid, SIGTERM)
-                time.sleep(0.1)
-        except OSError, err:
-            err = str(err)
-            if err.find("No such process") > 0:
-                if os.path.exists(self.pidfile):
-                    os.remove(self.pidfile)
-            else:
-                print str(err)
-                sys.exit(1)
+        #try:
+        #    while 1:
+        #        os.kill(pid, SIGTERM)
+        #        time.sleep(0.1)
+        #except OSError, err:
+        #    err = str(err)
+        #    if err.find("No such process") > 0:
+        #        if os.path.exists(self.pidfile):
+        #            os.remove(self.pidfile)
+        #    else:
+        #        print str(err)
+        #        sys.exit(1)
 
     def restart(self):
         """
